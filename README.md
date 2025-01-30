@@ -2,6 +2,7 @@
 
 Particles is a small particle life/clusters simulation written in C++ and Vulkan for learning purposes.
 Clusters is a particle system introduced by [Jeffrey Ventrella](https://www.ventrella.com/Clusters/intro.html).
+Right now it can only handle a low amount of particles (<1000) depending on the hardware the renderer is running on.
 
 ## Screenshots
 ![A screenshot was supposed to be here](assets/screenshots/screenshot_1.PNG)
