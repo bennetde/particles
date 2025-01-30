@@ -4,11 +4,9 @@ Particles is a small particle life/clusters simulation written in C++ and Vulkan
 Clusters is a particle system introduced by [Jeffrey Ventrella](https://www.ventrella.com/Clusters/intro.html).
 
 ## Screenshots
-
-![A screenshot was supposed to be here](assets/screenshots/screenshot_1.png)
+![A screenshot was supposed to be here](assets/screenshots/screenshot_1.PNG)
 
 ## Dependencies & Setup
-
 All dependencies are handled using vcpkg. CMake is used as a meta buildsystem.
 
 Dependencies:
@@ -24,13 +22,10 @@ Dependencies:
 The project adds a custom target for building shaders separately.
 
 ## TODO
-
 - [ ] Optimizations
 - [ ] Window Resize
 - [ ] Code Cleanup & Documentation
-- 
 
 ## Contributions
-
 This is a private project for learning purporses, so I will not accept any pull requests.
 But feel free to fork the project and adapt it to your needs.
