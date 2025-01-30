@@ -1,0 +1,6 @@
+bin/
+build/
+.vscode
+CMakePresets.json
+CMakeUserPresets.json
+shaders/*.spv
