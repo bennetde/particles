@@ -26,6 +26,7 @@ The project adds a custom target for building shaders separately.
 - [ ] Optimizations
 - [ ] Window Resize
 - [ ] Code Cleanup & Documentation
+- [ ] Customizable particle count
 
 ## Contributions
 This is a private project for learning purporses, so I will not accept any pull requests.
