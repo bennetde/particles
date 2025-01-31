@@ -7,6 +7,8 @@ Right now it can only handle a low amount of particles (<1000) depending on the 
 ## Screenshots
 ![A screenshot was supposed to be here](assets/screenshots/screenshot_1.PNG)
 
+![A screenshot was supposed to be here](assets/screenshots/screenshot_2.PNG)
+
 ## Dependencies & Setup
 All dependencies are handled using vcpkg. CMake is used as a meta buildsystem.
 
