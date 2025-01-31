@@ -2,12 +2,16 @@
 
 Particles is a small particle life/clusters simulation written in C++ and Vulkan for learning purposes.
 Clusters is a particle system introduced by [Jeffrey Ventrella](https://www.ventrella.com/Clusters/intro.html).
-Right now it can only handle a low amount of particles (<1000) depending on the hardware the renderer is running on.
+
+It can simulate around 32k particles using compute shaders.
 
 ## Screenshots
-![A screenshot was supposed to be here](assets/screenshots/screenshot_1.PNG)
 
-![A screenshot was supposed to be here](assets/screenshots/screenshot_2.PNG)
+
+https://github.com/user-attachments/assets/3c4c3e43-497f-49eb-acab-2cdc09c80034
+
+![A screenshot was supposed to be here](assets/screenshots/screenshot_1.PNG)
+![A screenshot was supposed to be here](assets/screenshots/screenshot_2.png)
 
 ## Dependencies & Setup
 All dependencies are handled using vcpkg. CMake is used as a meta buildsystem.
@@ -25,7 +29,7 @@ Dependencies:
 The project adds a custom target for building shaders separately.
 
 ## TODO
-- [ ] Optimizations
+- [x] Optimizations
 - [ ] Window Resize
 - [ ] Code Cleanup & Documentation
 - [ ] Customizable particle count
