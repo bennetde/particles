@@ -1,0 +1,54 @@
+//GLSL version to use
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+struct Particle {
+	vec4 position;
+	vec4 velocity;
+	ivec4 color;
+};
+
+//size of a workgroup for compute
+layout (local_size_x = 256, local_size_y = 1) in;
+
+//descriptor bindings for the pipeline
+layout(std430, binding = 0) buffer Particles {
+    Particle particles[];
+};
+
+layout(std430, binding = 1, set = 0) uniform SimulationSettings {
+    float attractions[64];
+} simulationSettings;
+
+const float BETA = 0.3f;
+const float R_MAX = 3.0f;
+const float dt = 0.005f;
+void main() 
+{
+    uint index = gl_GlobalInvocationID.x;  
+    Particle particleIn = particles[index];
+    particles[index].velocity *= pow(0.5f, dt / 0.04f);
+    vec2 accForce;
+    for(int j = 0; j < particles.length(); j++) {
+        if(j == index) continue;
+        Particle other = particles[j];
+
+        float a = simulationSettings.attractions[particleIn.color.r * 8 + other.color.r];
+        float dist = distance(particleIn.position.xy, other.position.xy) / R_MAX;
+        float force = 0.0f;
+        if(dist < BETA) {
+            force = dist / BETA - 1.0f;
+        } else if (BETA < dist && dist < 1.0f) {
+            force = a * (1.0f - abs(2.0f * dist - 1.0f - BETA) / (1.0f - BETA));
+        } else {
+            force = 0.0f;
+        }
+
+        vec2 dir = normalize(particleIn.position.xy - other.position.xy);
+        accForce -= dir * force * R_MAX * 10.0f;
+    }
+
+    //particles[index].position.x += 0.01f;
+    particles[index].velocity.xy += accForce * dt;
+    particles[index].position.xy += particles[index].velocity.xy * dt;
+}

@@ -12,6 +12,9 @@ Buffer Buffer::create(size_t allocSize, VkBufferUsageFlags usageFlags, VmaMemory
     VmaAllocationCreateInfo vmaAllocInfo = {};
     vmaAllocInfo.usage = memoryUsage;
     vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    if(memoryUsage == VMA_MEMORY_USAGE_AUTO) {
+        vmaAllocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    }
     
     Buffer newBuffer;
 

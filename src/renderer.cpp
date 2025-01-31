@@ -22,6 +22,7 @@
 #include <array>
 #include <random>
 #include <cstdlib>
+#include "descriptor_layout.h"
 
 constexpr bool useValidationLayers = true;
 
@@ -41,6 +42,7 @@ void ParticleRenderer::init() {
     initImgui();
     initParticlePipeline();
     initParticles();
+    initComputePipeline();
     _isInitialized = true;
 }
 
@@ -93,7 +95,7 @@ void ParticleRenderer::run() {
                     for(int i = 0; i < 8; i++) {
                         for(int j = 0; j < 8; j++) {
                             ImGui::PushItemWidth(50.f);
-                            ImGui::DragFloat(std::format("##{}", index).c_str(), &_attractions[i][j], 0.01f, -1.0f, 1.0f, "%.2f");
+                            ImGui::DragFloat(std::format("##{}", index).c_str(), &_simulationSettings.attractions[i * 8 + j], 0.01f, -1.0f, 1.0f, "%.2f");
                             ImGui::SameLine();
                             index++;
                         }
@@ -132,6 +134,10 @@ void ParticleRenderer::draw() {
     // Begin Command Buffer for drawing
     VkCommandBufferBeginInfo cmdBeginInfo = init::CommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _computePipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _computePipelineLayout, 0, 1, &_computeDescriptorSet, 0, 0);
+    vkCmdDispatch(cmd, _particleCount / 256, 1, 1);
 
     // Clear current swapchain
     image::transitionImage(cmd, swapchain->images[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);    
@@ -314,6 +320,7 @@ void ParticleRenderer::initVulkan() {
     VkPhysicalDeviceVulkan12Features features12 { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     features12.bufferDeviceAddress = true;
     features12.descriptorIndexing = true;
+    features12.uniformBufferStandardLayout = true;
 
     VkPhysicalDeviceFeatures features {};
     features.fillModeNonSolid = true;
@@ -579,7 +586,7 @@ void ParticleRenderer::initParticles() {
     for(int i = 0; i < 8; i++) {
         for(int j = 0; j < 8; j++) {
             float r = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2 - 1;
-            _attractions[i][j] = r;
+            _simulationSettings.attractions[i * 8 + j] = r;
         }
     }
 
@@ -587,7 +594,7 @@ void ParticleRenderer::initParticles() {
 
     std::random_device rd;  // a seed source for the random number engine
     std::mt19937 gen(rd()); // mersenne_twister_engine seeded with rd()
-    std::uniform_real_distribution<> dis(-10.0f, 10.0f);
+    std::uniform_real_distribution<> dis(_spawnBoundaries.r, _spawnBoundaries.g);
     std::uniform_int_distribution<> colorDistribution(0, 7);
     for(int i = 0; i < _particleCount; i++) {
         _particles.push_back({ .position = {dis(gen), dis(gen), 0.0f, 0.0f}, .velocity = glm::vec4{0.0f}, .color = glm::ivec4{colorDistribution(gen)}});
@@ -627,7 +634,7 @@ void ParticleRenderer::updateParticles() {
         for(int j = 0; j < _particles.size(); j++) {
             if(i == j) continue;
 
-            float a = _attractions[_particles[i].color.r][_particles[j].color.r];
+            float a = _simulationSettings.attractions[_particles[i].color.r * 8 + _particles[j].color.r];
             glm::vec2 forceChange = _particles[i].computeForce(_particles[j], a);
             if(force.x == NAN || force.y == NAN) continue; 
             force -= forceChange; 
@@ -647,5 +654,107 @@ void ParticleRenderer::updateParticles() {
         copy.size = sizeof(Particle) * _particleCount;
 
         vkCmdCopyBuffer(cmd, _particleStagingBuffer.buffer, _particleBuffer.buffer, 1, &copy);
+    });
+}
+
+
+void ParticleRenderer::initComputePipeline() {
+    _simulationSettingsBuffer = Buffer::create(sizeof(SimulationSettings), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_AUTO, _allocator);
+    VK_CHECK(vmaCopyMemoryToAllocation(_allocator, &_simulationSettings, _simulationSettingsBuffer.allocation, 0, sizeof(float[64])));
+
+    std::vector<VkDescriptorPoolSize> sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
+    };
+
+    VkDescriptorPoolCreateInfo createPool{};
+    createPool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    createPool.pNext = nullptr;
+    createPool.pPoolSizes = sizes.data();
+    createPool.poolSizeCount = (uint32_t)sizes.size();
+    createPool.flags = 0;
+    createPool.maxSets = 2;
+    VK_CHECK(vkCreateDescriptorPool(_device, &createPool, nullptr, &_computeDescriptorPool));
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        builder.addBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        _computeDescriptorSetLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT, nullptr, 0);
+    }
+
+    VkDescriptorSetAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocateInfo.descriptorPool = _computeDescriptorPool;
+    allocateInfo.descriptorSetCount = 1;
+    allocateInfo.pNext = nullptr;
+    allocateInfo.pSetLayouts = &_computeDescriptorSetLayout;
+    VK_CHECK(vkAllocateDescriptorSets(_device, &allocateInfo, &_computeDescriptorSet));
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = _particleBuffer.buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = _particleBuffer.allocationInfo.size;
+
+
+    VkWriteDescriptorSet computeSetWrite = {};
+    computeSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    computeSetWrite.pNext = nullptr;
+    computeSetWrite.dstBinding = 0;
+    computeSetWrite.dstSet = _computeDescriptorSet;
+    computeSetWrite.descriptorCount = 1;
+    computeSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    computeSetWrite.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(_device, 1, &computeSetWrite, 0, nullptr);
+
+    bufferInfo.buffer = _simulationSettingsBuffer.buffer;
+    bufferInfo.range = sizeof(SimulationSettings);
+
+    computeSetWrite.dstBinding= 1;
+    computeSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    computeSetWrite.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(_device, 1, &computeSetWrite, 0, nullptr);
+
+    _deletionQueue.pushFunction([&]() {
+        vkDestroyDescriptorPool(_device, _computeDescriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(_device, _computeDescriptorSetLayout, nullptr);
+    });
+
+    VkShaderModule particleComputeShader;
+    if(!init::LoadShaderModule("../shaders/particle.comp.spv", _device, &particleComputeShader)) {
+        throw std::runtime_error("Failed to load particle compute shader");
+    }
+
+    VkPipelineShaderStageCreateInfo stageInfo{};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.pNext = nullptr;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = particleComputeShader;
+    stageInfo.pName = "main";
+
+    VkPipelineLayoutCreateInfo computeLayout{};
+    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    computeLayout.pNext = nullptr;
+    computeLayout.pSetLayouts = &_computeDescriptorSetLayout;
+    computeLayout.setLayoutCount = 1;
+
+    VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_computePipelineLayout));
+
+    VkComputePipelineCreateInfo computePipelineCreateInfo{};
+    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineCreateInfo.pNext = nullptr;
+    computePipelineCreateInfo.layout = _computePipelineLayout;
+    computePipelineCreateInfo.stage = stageInfo;
+
+    VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &_computePipeline));
+
+    vkDestroyShaderModule(_device, particleComputeShader, nullptr);
+
+    _deletionQueue.pushFunction([&]() {
+        _simulationSettingsBuffer.destroy(_allocator);
+        vkDestroyPipelineLayout(_device, _computePipelineLayout, nullptr);
+        vkDestroyPipeline(_device, _computePipeline, nullptr);
     });
 }

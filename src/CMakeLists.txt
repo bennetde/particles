@@ -7,6 +7,7 @@ add_executable(renderer
     buffer.cpp
     pipeline.cpp
     particles/particle.cpp
+    descriptor_layout.cpp
     deletion_queue.cpp
     )
 

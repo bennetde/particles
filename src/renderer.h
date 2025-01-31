@@ -8,6 +8,7 @@
 #include "glm/glm.hpp"
 #include "buffer.h"
 #include "particles/particle.h"
+#include "particles/simulation_settings.h"
 
 constexpr unsigned int FRAME_OVERLAP = 1;
 
@@ -64,18 +65,29 @@ private:
     float _zoom = 0.1f;
 
     std::vector<Particle> _particles;
-    uint32_t _particleCount = 500;
+    uint32_t _particleCount = 32768/2;
+    glm::vec2 _spawnBoundaries = {-100.0f, 100.0f};
     Buffer _particleBuffer;
     Buffer _particleStagingBuffer;
     VkDeviceAddress _particleBufferAddress;
     bool _simulate = false;
     //std::array<std::array<int, 8>, 8> _attractions;
-    float _attractions[8][8];
+    SimulationSettings _simulationSettings;
+    Buffer _simulationSettingsBuffer;
+    
 
 
     VkFence _immFence;
     VkCommandBuffer _immCommandBuffer;
     VkCommandPool _immCommandPool;
+
+
+    VkDescriptorPool _computeDescriptorPool;
+    VkDescriptorSetLayout _computeDescriptorSetLayout;
+    VkDescriptorSet _computeDescriptorSet;
+    VkDescriptorSet _simulationSettingsDescriptorSet;
+    VkPipeline _computePipeline;
+    VkPipelineLayout _computePipelineLayout;
 
     void draw();
     void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
@@ -88,6 +100,7 @@ private:
     void initParticlePipeline();
     void initParticles();
     void updateParticles();
+    void initComputePipeline();
 
     FrameData& getCurrentFrame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
     void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
