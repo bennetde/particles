@@ -55,6 +55,7 @@ void ParticleRenderer::run() {
     }
 
     while(!shouldQuit) {
+        auto start = std::chrono::system_clock::now();
         while(SDL_PollEvent(&e) != 0) {
             if(e.type == SDL_EVENT_QUIT) {
                 shouldQuit = true;
@@ -86,6 +87,7 @@ void ParticleRenderer::run() {
             if(ImGui::Begin("Main", (bool*)0, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
                 {
                     ImGui::BeginChild("Left Pane", ImVec2{150, 0}, ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeX);
+                    ImGui::Text("Frametime: %f ms", _frametime);
                     ImGui::DragFloat3("Camera Position", (float*)&_cameraPosition);
                     ImGui::DragFloat("Camera Zoom", &_zoom, 0.001f, 0.01f, 5.0f);
                     ImGui::Checkbox("Simulate", &_simulate);
@@ -117,6 +119,11 @@ void ParticleRenderer::run() {
         updateParticles();
         ImGui::Render();
         draw();
+
+
+        auto end = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        _frametime = elapsed.count() / 1000.f;
     }
 }
 

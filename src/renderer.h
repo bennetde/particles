@@ -74,8 +74,6 @@ private:
     //std::array<std::array<int, 8>, 8> _attractions;
     SimulationSettings _simulationSettings;
     Buffer _simulationSettingsBuffer;
-    
-
 
     VkFence _immFence;
     VkCommandBuffer _immCommandBuffer;
@@ -88,6 +86,8 @@ private:
     VkDescriptorSet _simulationSettingsDescriptorSet;
     VkPipeline _computePipeline;
     VkPipelineLayout _computePipelineLayout;
+
+    float _frametime;
 
     void draw();
     void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
